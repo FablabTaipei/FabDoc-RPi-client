@@ -4,6 +4,25 @@ from socketIO_client import SocketIO
 from PIL import Image
 from cStringIO import StringIO
 
+import cv2
+import cv2.cv as cv
+import zbarlight
+from picamera import PiCamera
+from picamera.array import PiRGBArray
+import time
+import numpy
+
+
+def qrCheck(arg):
+    """ Check an image for a QR code, return as string """
+    image_string = arg.tostring()
+    try:
+        code = zbarlight.qr_code_scanner(image_string, 400, 300)
+        return code
+    except:
+        return
+
+
 size = 480, 480
 socket = None
 strPath = None
@@ -176,6 +195,30 @@ def main(argv):
 	# 	sys.exit(2)
 
 	hashcode = ""
+
+	# initialize picamera
+	camera = PiCamera()
+	resolution = (400, 300)
+	camera.resolution = resolution
+	raw_capture = PiRGBArray(camera, size = resolution)
+	time.sleep(0.1)
+
+
+	for frame in camera.capture_continuous(raw_capture,
+					       format = "bgr",
+					       use_video_port = True):
+	    # grab image as numpy array
+	    image = frame.array
+		
+	    # convert image to grayscale and decode
+	    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	    decoded = qrCheck(gray)
+
+	    if decoded:
+		hashcode = decoded
+		break 
+
+
 	try:
 		opts, args = getopt.getopt(argv,"hs:H:p:t:",["help","source","host","port","token"])
 	except getopt.GetoptError:
@@ -200,6 +243,8 @@ def main(argv):
 
 	# generate hash
 	# hashcode = genHashCode(strUser, strPassword)
+
+
 
 	print "token: ", hashcode
 
