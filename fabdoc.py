@@ -1,57 +1,35 @@
 import os, sys, getopt, hashlib, math, base64, time
 from requests.exceptions import ConnectionError
-from socketIO_client import SocketIO
+from socketIO_client import SocketIO, BaseNamespace
 from PIL import Image
 from cStringIO import StringIO
+from watchdog.observers import Observer  
+from watchdog.events import PatternMatchingEventHandler  
 
-import cv2
-import cv2.cv as cv
-import zbarlight
-from picamera import PiCamera
-from picamera.array import PiRGBArray
-import time
-import numpy
+# ========== Detect qrcode region START ==========
+# import cv2
+# import cv2.cv as cv
+# import zbarlight
+# from picamera import PiCamera
+# from picamera.array import PiRGBArray
+# import time
+# import numpy
 
 
-def qrCheck(arg):
-    """ Check an image for a QR code, return as string """
-    image_string = arg.tostring()
-    try:
-        code = zbarlight.qr_code_scanner(image_string, 400, 300)
-        return code
-    except:
-        return
-
+# def qrCheck(arg):
+#     """ Check an image for a QR code, return as string """
+#     image_string = arg.tostring()
+#     try:
+#         code = zbarlight.qr_code_scanner(image_string, 400, 300)
+#         return code
+#     except:
+#         return
+# ========== Detect qrcode region END ==========
 
 size = 480, 480
 socket = None
 strPath = None
-
-# ===== Generate Thumbnail =====
-# def genThumbnail(strFileIn):
-#     outfile = os.path.splitext(strFileIn)[0] + ".thumbnail"
-#     if (strFileIn != outfile) :  # and (os.path.isfile(outfile) != True) :
-#         try:
-#             im = Image.open(strFileIn)
-#             im.thumbnail(size)
-#             im.save(outfile, "JPEG")
-#             return 1
-#         except IOError:
-#             print "cannot create thumbnail for", strFileIn
-#     return 0        
-
-# def genThumbnailForDirectory(strFilePathIn):
-#     print " Create thumbnail for: ", strFilePathIn
-#     intCount=0
-#     for root, dirs, files in os.walk(strFilePathIn):
-#         for file in files:
-#             if file.endswith(".jpg") or file.endswith(".JPG") or file.endswith(".png") or file.endswith(".PNG") or file.endswith(".bmp") or file.endswith(".BMP"):
-#                  print(intCount)
-#                  strFileName = os.path.join(root, file)
-#                  print(strFileName)
-#                  intCount = intCount + genThumbnail(strFileName)
-#     print "Thumbnail generated: ", intCount
-#     return intCount
+observer = None
 
 # ===== generate MD5 =====
 # m = hashlib.md5()
@@ -127,38 +105,91 @@ Options:
 # 	m.update(strManualResult)
 # 	return m.hexdigest()
 
-def on_connect_error(error):
-	print 'Connect Error:', error
+# file detection
+class FileDetectionHandler(PatternMatchingEventHandler):
+	patterns = ["*.jpg", "*.jpeg", "*.png", "*.bmp"]
+	def process(self, event):
+		"""
+		event.event_type 
+            'modified' | 'created' | 'moved' | 'deleted'
+        event.is_directory
+            True | False
+        event.src_path
+            path/to/observed/file
+        """
+		# the file will be processed there
+		print event.src_path, event.event_type
+	def on_modified(self, event):
+		self.process(event)
+	def on_created(self, event):
+		self.process(event)
+		pass_thumbnail_image(event.src_path)
 
-def on_error(error):
-	print 'Error:', error
+	def on_deleted(self, event):
+		self.process(event)
 
+# resize and generate base64
+def pass_thumbnail_image(strFilePath):
+	try:
+		# generate thumbnail
+		output = StringIO()
+		strFilePath = os.path.abspath(strFilePath)
+		im = Image.open(strFilePath)
+		im.thumbnail(size)
+		im.save(output, format='PNG')
+
+		# resize to the base64, dataurl format: 'data:image/png;base64,{base64_encoded_string}'
+		im_data = output.getvalue()
+		if socket is not None:
+			base64Data = base64.b64encode(im_data)
+			# pass to server
+			socket.emit("pass_compressed_image", { 'base64': base64Data, 'type': 'image/png' } )
+	except IOError:
+		print "cannot generate base64 for: ", strFilePath
+
+# wait 2 seconds and pass thumbnail image to server for each image file
 def walk_pass_images(path):
 	for root, dirs, files in os.walk(os.path.abspath(path)):
 		for file in files:
 			if file.endswith((".jpg",".JPG",".jpeg",".JPEG",".png",".PNG",".bmp",".BMP")):
 				strFileName = os.path.join(root, file)
-				# wait 2 seconds
-				# resize and generate base64
-				# pass to server
-				try:
-					output = StringIO()
-					im = Image.open(strFileName)
-					im.thumbnail(size)
-            		# im.save(outfile, "JPEG")
-					im.save(output, format='PNG')
-					im_data = output.getvalue()
-					# data_url = 'data:image/png;base64,' + base64.b64encode(im_data)
-					if socket is not None:
-						base64Data = base64.b64encode(im_data)
-						socket.emit("pass_compressed_image", { 'base64': base64Data, 'type': 'image/png' } )
-				except IOError:
-					print "cannot generate base64 for: ", strFileName
+				pass_thumbnail_image(strFileName)
 				time.sleep(2)
 
-def on_connect():
-	if strPath is not None:
-		walk_pass_images(strPath)
+def observer_abort():
+	if observer is not None:
+		observer.stop()
+		observer.join()
+		observer = None
+
+def observer_start(p):
+	observer = Observer()
+	observer.schedule(FileDetectionHandler(), path=p)
+	observer.start()
+
+# Socket event collection namespace
+class SocketEventsNamespace(BaseNamespace):
+	def on_connect_error(error):
+		print 'Connect Error:', error
+
+	def on_error(error):
+		print 'Error:', error
+
+	def on_connect(opt):
+		if strPath is not None:
+			observer_start(strPath)
+			walk_pass_images(strPath)
+
+	def on_disconnect():
+	    print 'disconnect'
+	    observer_abort()
+
+	def on_reconnect():
+	    print 'reconnect'
+	    observer_abort()
+	    if strPath is not None:
+			observer_start(strPath)
+
 
 #Main
 def main(argv):
@@ -196,28 +227,29 @@ def main(argv):
 
 	hashcode = ""
 
+# ========== Detect qrcode region START ==========
 	# initialize picamera
-	camera = PiCamera()
-	resolution = (400, 300)
-	camera.resolution = resolution
-	raw_capture = PiRGBArray(camera, size = resolution)
-	time.sleep(0.1)
+	# camera = PiCamera()
+	# resolution = (400, 300)
+	# camera.resolution = resolution
+	# raw_capture = PiRGBArray(camera, size = resolution)
+	# time.sleep(0.1)
 
 
-	for frame in camera.capture_continuous(raw_capture,
-					       format = "bgr",
-					       use_video_port = True):
-	    # grab image as numpy array
-	    image = frame.array
+	# for frame in camera.capture_continuous(raw_capture,
+	# 				       format = "bgr",
+	# 				       use_video_port = True):
+	#     # grab image as numpy array
+	#     image = frame.array
 		
-	    # convert image to grayscale and decode
-	    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	    decoded = qrCheck(gray)
+	#     # convert image to grayscale and decode
+	#     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	#     decoded = qrCheck(gray)
 
-	    if decoded:
-		hashcode = decoded
-		break 
-
+	#     if decoded:
+	# 	hashcode = decoded
+	# 	break 
+# ========== Detect qrcode region END ==========
 
 	try:
 		opts, args = getopt.getopt(argv,"hs:H:p:t:",["help","source","host","port","token"])
@@ -244,8 +276,6 @@ def main(argv):
 	# generate hash
 	# hashcode = genHashCode(strUser, strPassword)
 
-
-
 	print "token: ", hashcode
 
 	try:
@@ -255,14 +285,14 @@ def main(argv):
 		#     headers={'Authorization': 'Basic ' + b64encode('username:password')},
 		#     cookies={'a': 'aaa'},
 		#     proxies={'https': 'https://proxy.example.com:8080'})
-	    socket = SocketIO(strHost, int(strPort), wait_for_connection=False, params={ 'token': hashcode } )
-	    socket.on('connect_error', on_connect_error)
-	    socket.on('error', on_error)
-	    socket.on('connect', on_connect)
-	    socket.wait()
-	except ConnectionError:
-	    print('The server is down. Try again later.')
-
+		socket = SocketIO(strHost, int(strPort), wait_for_connection=False, params={ 'token': hashcode } )
+		socket.define(SocketEventsNamespace)
+		socket.wait()
+	except:
+		print "Error: ", sys.exc_info()[0]
+		observer_abort()
+		raise
 
 if __name__ == "__main__":
 	main(sys.argv[1:])
+
