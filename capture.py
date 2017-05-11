@@ -10,10 +10,11 @@ import time
 import threading
 
 class Camera:
-	def __init__(self, resolution=(640, 480), framerate=30):
+	def __init__(self, resolution=(640, 480), framerate=30, timeGap=10):
 		self.camera = PiCamera()
 		self.camera.resolution = resolution
 		self.camera.framerate = framerate
+		self.timeGap = timeGap
 		self.isDecoded = False
 		self.code = ""
 
@@ -46,7 +47,17 @@ class Camera:
 				self.code = decoded
 				break 
 
+	def captureTimeLapse(self):
+		for filename in self.camera.capture_continuous('./test/{counter:03d}.jpg'):
+			print('Captured %s' % filename)
+			time.sleep(self.timeGap)
+
 	def run(self):
-		cameraThread = threading.Thread(target=self.scanQRcode)
-		cameraThread.start()
+		qrThread = threading.Thread(target=self.scanQRcode)
+		qrThread.start()
 		print "Start capture QR code"
+		qrThread.join()
+
+		captureThread = threading.Thread(target=self.captureTimeLapse)
+		captureThread.start()
+
