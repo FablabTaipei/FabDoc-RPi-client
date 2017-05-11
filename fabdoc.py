@@ -6,25 +6,8 @@ from cStringIO import StringIO
 from watchdog.observers import Observer  
 from watchdog.events import PatternMatchingEventHandler  
 
-# ========== Detect qrcode region START ==========
-# import cv2
-# import cv2.cv as cv
-# import zbarlight
-# from picamera import PiCamera
-# from picamera.array import PiRGBArray
-# import time
-# import numpy
-
-
-# def qrCheck(arg):
-#     """ Check an image for a QR code, return as string """
-#     image_string = arg.tostring()
-#     try:
-#         code = zbarlight.qr_code_scanner(image_string, 400, 300)
-#         return code
-#     except:
-#         return
-# ========== Detect qrcode region END ==========
+import capture
+import threading
 
 size = 480, 480
 socket = None
@@ -225,31 +208,15 @@ def main(argv):
 	# 	print strHelpText
 	# 	sys.exit(2)
 
-	hashcode = ""
+	# Capture QR code in thread
+	camera = capture.Camera()
+	camera.run()
 
-# ========== Detect qrcode region START ==========
-	# initialize picamera
-	# camera = PiCamera()
-	# resolution = (400, 300)
-	# camera.resolution = resolution
-	# raw_capture = PiRGBArray(camera, size = resolution)
-	# time.sleep(0.1)
-
-
-	# for frame in camera.capture_continuous(raw_capture,
-	# 				       format = "bgr",
-	# 				       use_video_port = True):
-	#     # grab image as numpy array
-	#     image = frame.array
-		
-	#     # convert image to grayscale and decode
-	#     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	#     decoded = qrCheck(gray)
-
-	#     if decoded:
-	# 	hashcode = decoded
-	# 	break 
-# ========== Detect qrcode region END ==========
+	while(1):
+		if camera.isDecoded:
+			hashcode = camera.code
+			print hashcode
+			break 
 
 	try:
 		opts, args = getopt.getopt(argv,"hs:H:p:t:",["help","source","host","port","token"])
