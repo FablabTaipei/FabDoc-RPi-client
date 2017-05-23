@@ -113,6 +113,7 @@ class FileDetectionHandler(PatternMatchingEventHandler):
 
 # resize and generate base64
 def pass_thumbnail_image(strFilePath):
+	global socket
 	try:
 		# generate thumbnail
 		output = StringIO()
@@ -140,37 +141,41 @@ def walk_pass_images(path):
 				time.sleep(2)
 
 def observer_abort():
+	global observer
 	if observer is not None:
 		observer.stop()
 		observer.join()
 		observer = None
 
 def observer_start(p):
+	global observer
 	observer = Observer()
 	observer.schedule(FileDetectionHandler(), path=p)
 	observer.start()
 
 # Socket event collection namespace
 class SocketEventsNamespace(BaseNamespace):
-	def on_connect_error(error):
-		print 'Connect Error:', error
+	def on_connect_error(*errors):
+		print 'Connect Error:', "%s" % list(errors)
 
-	def on_error(error):
-		print 'Error:', error
+	def on_error(*errors):
+		print 'Error:', "%s" % list(errors)
 
 	def on_connect(opt):
+		global strPath
 		if strPath is not None:
 			observer_start(strPath)
 			walk_pass_images(strPath)
 
-	def on_disconnect():
+	def on_disconnect(*data):
 	    print 'disconnect'
 	    observer_abort()
 
-	def on_reconnect():
-	    print 'reconnect'
-	    observer_abort()
-	    if strPath is not None:
+	def on_reconnect(*data):
+		global strPath
+		print 'reconnect'
+		observer_abort()
+		if strPath is not None:
 			observer_start(strPath)
 
 
@@ -207,6 +212,8 @@ def main(argv):
 	# if len(opts) == 0 or strUser == "" or strPassword == "":
 	# 	print strHelpText
 	# 	sys.exit(2)
+
+	hashcode = ""
 
 	# Capture QR code in thread
 	camera = capture.Camera()
