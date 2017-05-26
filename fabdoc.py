@@ -3,8 +3,8 @@ from requests.exceptions import ConnectionError
 from socketIO_client import SocketIO, BaseNamespace
 from PIL import Image
 from cStringIO import StringIO
-from watchdog.observers import Observer  
-from watchdog.events import PatternMatchingEventHandler  
+from watchdog.observers import Observer
+from watchdog.events import PatternMatchingEventHandler
 
 import capture
 import threading
@@ -26,7 +26,7 @@ observer = None
 # data_url = 'data:image/jpg;base64,' + base64.b64encode(im_data)
 
 strHelpText = """
-Usage:   
+Usage:
     fabdoc <command> [options]
 
 Commands:
@@ -93,7 +93,7 @@ class FileDetectionHandler(PatternMatchingEventHandler):
 	patterns = ["*.jpg", "*.jpeg", "*.png", "*.bmp"]
 	def process(self, event):
 		"""
-		event.event_type 
+		event.event_type
             'modified' | 'created' | 'moved' | 'deleted'
         event.is_directory
             True | False
@@ -215,16 +215,6 @@ def main(argv):
 
 	hashcode = ""
 
-	# Capture QR code in thread
-	camera = capture.Camera()
-	camera.run()
-
-	while(1):
-		if camera.isDecoded:
-			hashcode = camera.code
-			print hashcode
-			break 
-
 	try:
 		opts, args = getopt.getopt(argv,"hs:H:p:t:",["help","source","host","port","token"])
 	except getopt.GetoptError:
@@ -243,12 +233,22 @@ def main(argv):
 			strPort = arg
 		elif opt in ("-t", "--token"):
 			hashcode = arg
-	if len(opts) == 0 or hashcode == "":
+	if len(opts) == 0:
 		print strHelpText
 		sys.exit(2)
 
 	# generate hash
 	# hashcode = genHashCode(strUser, strPassword)
+
+	# Capture QR code in thread
+	camera = capture.Camera( path = strPath )
+	camera.run()
+
+	while(1):
+		if camera.isDecoded:
+			hashcode = camera.code
+			print hashcode
+			break
 
 	print "token: ", hashcode
 

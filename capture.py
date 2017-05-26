@@ -10,11 +10,12 @@ import time
 import threading
 
 class Camera:
-	def __init__(self, resolution=(640, 480), framerate=30, timeGap=10):
+	def __init__(self, resolution=(640, 480), framerate=30, timeGap=10, path='./'):
 		self.camera = PiCamera()
 		self.camera.resolution = resolution
 		self.camera.framerate = framerate
 		self.timeGap = timeGap
+		self.path = path
 		self.isDecoded = False
 		self.code = ""
 
@@ -45,10 +46,10 @@ class Camera:
 			if decoded:
 				self.isDecoded = True
 				self.code = decoded
-				break 
+				break
 
 	def captureTimeLapse(self):
-		for filename in self.camera.capture_continuous('./test/{counter:03d}.jpg'):
+		for filename in self.camera.capture_continuous(self.path):
 			print('Captured %s' % filename)
 			time.sleep(self.timeGap)
 
