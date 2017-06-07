@@ -49,7 +49,7 @@ class Camera:
 				break
 
 	def captureTimeLapse(self):
-		for filename in self.camera.capture_continuous(self.path):
+		for filename in self.camera.capture_continuous(self.path + '{counter:03d}.jpg'):
 			print('Captured %s' % filename)
 			time.sleep(self.timeGap)
 
