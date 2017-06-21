@@ -24,7 +24,9 @@ pip install picamera watchdog zbarlight scipy
 python fabdoc.py -H IP_ADDRESS -p PORT -s IMAGE_PATH -t TOKEN
 ```
 
-### Examples
+
+
+## Examples
 ##### Without QR code token
 ```
 python fabdoc.py -s ./test/ -t e25339f8697bd2c3574931c93ecbb721
