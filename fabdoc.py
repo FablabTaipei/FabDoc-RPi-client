@@ -5,6 +5,7 @@ from PIL import Image
 from cStringIO import StringIO
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
+from urllib import quote_plus
 
 import capture
 import threading
@@ -117,8 +118,8 @@ def pass_thumbnail_image(strFilePath):
 	try:
 		# generate thumbnail
 		output = StringIO()
-		strFilePath = os.path.abspath(strFilePath)
-		im = Image.open(strFilePath)
+		strFullFilePath = os.path.abspath(strFilePath)
+		im = Image.open(strFullFilePath)
 		im.thumbnail(size)
 		im.save(output, format='PNG')
 
@@ -127,17 +128,16 @@ def pass_thumbnail_image(strFilePath):
 		if socket is not None:
 			base64Data = base64.b64encode(im_data)
 			# pass to server
-			socket.emit("pass_compressed_image", { 'base64': base64Data, 'type': 'image/png' } )
+			socket.emit("pass_compressed_image", { 'base64': base64Data, 'type': 'image/png', 'filepath': quote_plus(strFilePath) } )
 	except IOError:
-		print "cannot generate base64 for: ", strFilePath
+		print "cannot generate base64 for: ", strFullFilePath
 
 # wait 2 seconds and pass thumbnail image to server for each image file
 def walk_pass_images(path):
 	for root, dirs, files in os.walk(os.path.abspath(path)):
 		for file in files:
 			if file.endswith((".jpg",".JPG",".jpeg",".JPEG",".png",".PNG",".bmp",".BMP")):
-				strFileName = os.path.join(root, file)
-				pass_thumbnail_image(strFileName)
+				pass_thumbnail_image(strPath + file)
 				time.sleep(2)
 
 def observer_abort():
@@ -227,6 +227,8 @@ def main(argv):
 			sys.exit(2)
 		elif opt in ("-s", "--source"):
 			strPath = arg
+			if not strPath.endswith("/"):
+				strPath = strPath + "/"
 		elif opt in ("-H", "--host"):
 			strHost = arg
 		elif opt in ("-p", "--port"):
