@@ -14,8 +14,9 @@ To capture time-lapse pictures as pre-commits, this script helps you stream pict
 
 ### Dependency
 ```
-pip install -U socketIO-client
-pip install picamera watchdog zbarlight scipy
+sudo apt-get install python-dev
+sudo pip install -U socketIO-client
+sudo pip install picamera watchdog zbarlight scipy
 ```
 
 ### Usage
