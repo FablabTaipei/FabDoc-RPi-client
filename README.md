@@ -7,11 +7,10 @@ To capture time-lapse pictures as pre-commits, this script helps you stream pict
 - [x] Handle images for scale down and encode to base64
 - [x] Connect with remote server
 - [x] Detect file changes and pass the images to server
-- [x] Login into your account by scanning QR code token on your browser.
-- [ ] To commit, receive image upload request from browser via WebSocket, and pass original images into db
-- [ ] Solve reconnection situation
-  - Get index list of preview images which have been sent to server
-- [ ] Support IMU input to control and capture videos or GIFs by head motion.
+- [x] Login into your account by scanning QR code token on your browser
+- [ ] Solve reconnection issue
+  - Get index list of preview images which have been sent to server
+- [ ] Support IMU input to control and capture videos or GIFs by head motion
 
 ### Dependency
 ```
@@ -21,7 +20,7 @@ pip install picamera watchdog zbarlight scipy
 
 ### Usage
 ```
-python fabdoc.py -H IP_ADDRESS -p PORT -s IMAGE_PATH -t TOKEN
+python fabdoc.py -H [IP_ADDRESS] -p [PORT|default:80] -s [IMAGE_PATH] -t [TOKEN]
 ```
 
 
