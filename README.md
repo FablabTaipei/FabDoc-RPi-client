@@ -14,9 +14,10 @@ To capture time-lapse pictures as pre-commits, this script helps you stream pict
 
 ### Dependency
 ```
-sudo apt-get install python-dev
+sudo apt-get install python-dev python-opencv
+sudo apt-get install --fix-missing libzbar0 libzbar-dev
 sudo pip install -U socketIO-client
-sudo pip install picamera watchdog zbarlight scipy
+sudo pip install picamera PyDispatcher pyyaml watchdog zbarlight scipy
 ```
 
 ### Usage
