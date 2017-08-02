@@ -10,8 +10,9 @@ import time
 import threading
 
 class Camera:
-	def __init__(self, resolution=(640, 480), framerate=30, timeGap=10, path='./'):
+	def __init__(self, resolution=(640, 480), framerate=30, timeGap=10, path='./', vflip=True):
 		self.camera = PiCamera()
+		self.camera.vflip = vflip
 		self.camera.resolution = resolution
 		self.camera.framerate = framerate
 		self.timeGap = timeGap
