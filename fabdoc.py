@@ -8,7 +8,8 @@ from watchdog.events import PatternMatchingEventHandler
 from urllib import quote_plus
 
 import capture
-import threading
+from threading import Thread
+from Queue import Queue
 
 size = 480, 480
 socket = None
@@ -42,52 +43,24 @@ Options:
 
 """
 
-# def genHashCode(u, p):
-# 	strFirstHash = ""
-# 	strLong = ""
-# 	strShort = ""
-# 	if len(u) > len(p):
-# 		strLong = u
-# 		strShort = p
-# 	else:
-# 		strLong = p
-# 		strShort = u
-# 	# fisrt hash
-# 	intLongLen = len(strLong)
-# 	intShortLen = len(strShort)
-# 	intUnit = int(round(float(intLongLen) / float(intShortLen)))
-# 	for idx in range(intShortLen + 1):
-# 		strFirstHash = strFirstHash + strLong[(idx * intUnit):((idx + 1) * intUnit)]
-# 		if idx != intShortLen:
-# 			strFirstHash = strFirstHash + strShort[idx]
-# 	# secondary hash
-# 	strLeft = strFirstHash[:len(strFirstHash)/2]
-# 	strRight = strFirstHash[len(strFirstHash)/2:]
-# 	strLeftHash = ""
-# 	strRightHash = ""
-# 	intLeftLen = len(strLeft)
-# 	intRightLen = len(strRight)
-# 	while intLeftLen:
-# 		if intLeftLen % 2:
-# 			intLeftMid = int(math.floor(intLeftLen / 2))
-# 		else:
-# 			intLeftMid = intLeftLen / 2
-# 		strLeftHash = strLeftHash + strLeft[intLeftMid]
-# 		strLeft = strLeft[:intLeftMid] + strLeft[intLeftMid+1:]
-# 		intLeftLen = len(strLeft)
-# 	while intRightLen:
-# 		if intRightLen % 2:
-# 			intRightMid = int(math.floor(intRightLen / 2))
-# 		else:
-# 			intRightMid = intRightLen / 2
-# 		strRightHash = strRightHash + strRight[intRightMid]
-# 		strRight = strRight[:intRightMid] + strRight[intRightMid+1:]
-# 		intRightLen = len(strRight)
-# 	strManualResult = strLeftHash + strRightHash
-# 	# ===== generate MD5 =====
-# 	m = hashlib.md5()
-# 	m.update(strManualResult)
-# 	return m.hexdigest()
+imageQueue = Queue()
+
+class AutoEmitImage(Thread):
+	def __init__(self):
+		Thread.__init__(self)
+		self.daemon = True
+		self.start()
+
+	def run(self):
+		while True:
+			print "In AutoEmitImage run"
+			global imageQueue
+			global socket
+			if not imageQueue.empty() and socket is not None:
+				p = imageQueue.get()
+				pass_thumbnail_image(p)
+			time.sleep(2)
+
 
 # file detection
 class FileDetectionHandler(PatternMatchingEventHandler):
@@ -107,7 +80,9 @@ class FileDetectionHandler(PatternMatchingEventHandler):
 		self.process(event)
 	def on_created(self, event):
 		self.process(event)
-		pass_thumbnail_image(event.src_path)
+		# push a file path into queue
+		global imageQueue
+		imageQueue.put(event.src_path)
 
 	def on_deleted(self, event):
 		self.process(event)
@@ -129,16 +104,21 @@ def pass_thumbnail_image(strFilePath):
 			base64Data = base64.b64encode(im_data)
 			# pass to server
 			socket.emit("pass_compressed_image", { 'base64': base64Data, 'type': 'image/png', 'filepath': quote_plus(strFilePath) } )
+			print strFilePath, " passed"
 	except IOError:
 		print "cannot generate base64 for: ", strFullFilePath
 
 # wait 2 seconds and pass thumbnail image to server for each image file
 def walk_pass_images(path):
+	global imageQueue
 	for root, dirs, files in os.walk(os.path.abspath(path)):
 		for file in files:
 			if file.endswith((".jpg",".JPG",".jpeg",".JPEG",".png",".PNG",".bmp",".BMP")):
-				pass_thumbnail_image(strPath + file)
-				time.sleep(2)
+				toPassPath = strPath + file
+				# push a file path into queue
+				imageQueue.put(toPassPath)
+				print "Push ", toPassPath, " into queue"
+
 
 def observer_abort():
 	global observer
@@ -162,21 +142,13 @@ class SocketEventsNamespace(BaseNamespace):
 		print 'Error:', "%s" % list(errors)
 
 	def on_connect(opt):
-		global strPath
-		if strPath is not None:
-			observer_start(strPath)
-			walk_pass_images(strPath)
+		print 'connected'
 
 	def on_disconnect(*data):
 	    print 'disconnect'
-	    observer_abort()
 
 	def on_reconnect(*data):
-		global strPath
 		print 'reconnect'
-		observer_abort()
-		if strPath is not None:
-			observer_start(strPath)
 
 
 #Main
@@ -238,6 +210,15 @@ def main(argv):
 	if len(opts) == 0:
 		print strHelpText
 		sys.exit(2)
+
+	# Make a queue of image paths for socket emit
+	AutoEmitImage()
+
+	# Detect file changes from input path and pass path to queue
+	observer_start(strPath)
+	
+	# Pass current files in input path to queue
+	walk_pass_images(strPath)
 
 	# generate hash
 	# hashcode = genHashCode(strUser, strPassword)
