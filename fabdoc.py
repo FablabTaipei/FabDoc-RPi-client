@@ -53,10 +53,9 @@ class AutoEmitImage(Thread):
 
 	def run(self):
 		while True:
-			print "In AutoEmitImage run"
 			global imageQueue
 			global socket
-			if not imageQueue.empty() and socket is not None:
+			if not imageQueue.empty() and socket is not None and socket.connected:
 				p = imageQueue.get()
 				pass_thumbnail_image(p)
 			time.sleep(2)
@@ -104,7 +103,7 @@ def pass_thumbnail_image(strFilePath):
 			base64Data = base64.b64encode(im_data)
 			# pass to server
 			socket.emit("pass_compressed_image", { 'base64': base64Data, 'type': 'image/png', 'filepath': quote_plus(strFilePath) } )
-			print strFilePath, " passed"
+			print strFilePath, "passed"
 	except IOError:
 		print "cannot generate base64 for: ", strFullFilePath
 
@@ -117,7 +116,7 @@ def walk_pass_images(path):
 				toPassPath = strPath + file
 				# push a file path into queue
 				imageQueue.put(toPassPath)
-				print "Push ", toPassPath, " into queue"
+				print "Push", toPassPath, "into queue"
 
 
 def observer_abort():
